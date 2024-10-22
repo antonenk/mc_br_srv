@@ -1,0 +1,126 @@
+#!/bin/bash
+
+SERVER_VERSION=1.20.62.01
+SERVER_PATH=/opt/minecraft
+WORLDS_PATH=$(pwd)
+
+
+function build_image {
+    docker build --build-arg VERSION=$SERVER_VERSION -t minecraft-bedrock:$SERVER_VERSION .
+}
+
+function create_world {
+    local world_name=$1
+    local world_seed=$2
+
+    local world_path=$WORLDS_PATH/$world_name
+
+    mkdir $world_path \
+          $world_path/development_behavior_packs \
+          $world_path/development_resource_packs \
+          $world_path/development_skin_packs \
+          $world_path/minecraftpe \
+          $world_path/premium_cache \
+          $world_path/treatments \
+          $world_path/worlds \
+          $world_path/world_templates \
+
+    echo "level-name=$world_name
+level-seed=$world_seed
+server-name=The Antonenkovs
+gamemode=survival
+force-gamemode=true
+difficulty=easy
+allow-cheats=false
+max-players=10
+online-mode=false
+allow-list=false
+server-port=19132
+server-portv6=19133
+enable-lan-visibility=true
+view-distance=32
+tick-distance=4
+player-idle-timeout=30
+max-threads=8
+default-player-permission-level=member
+texturepack-required=false
+content-log-file-enabled=true
+compression-threshold=1
+compression-algorithm=zlib
+server-authoritative-movement=server-auth
+player-position-acceptance-threshold=0.5
+player-movement-action-direction-threshold=0.85
+server-authoritative-block-breaking=false
+server-authoritative-block-breaking-pick-range-scalar=1.5
+chat-restriction=None
+disable-player-interaction=false
+client-side-chunk-generation-enabled=true
+block-network-ids-are-hashes=true
+disable-persona=false
+disable-custom-skins=false
+server-build-radius-ratio=Disabled
+allow-outbound-script-debugging=false
+allow-inbound-script-debugging=false
+script-debugger-auto-attach=disabled" > $world_path/server.properties
+
+    echo "[]" > $world_path/valid_known_packs.json
+    echo "[]" > $world_path/allow_list.json
+    echo "[]" > $world_path/permissions.json
+    touch $world_path/packet-statistics.txt
+    touch $world_path/Dedicated_Server.txt
+}
+
+function start_old {
+    local world_name=$1
+
+    local world_path=$WORLDS_PATH/$world_name
+
+    docker run -it \
+        --user `id -u` \
+        -p 19132:19132 \
+        -w $SERVER_PATH \
+        -e LD_LIBRARY_PATH=. \
+        -v $world_path/server.properties:$SERVER_PATH/server.properties \
+        -v $world_path/valid_known_packs.json:$SERVER_PATH/valid_known_packs.json \
+        -v $world_path/Dedicated_Server.txt:$SERVER_PATH/Dedicated_Server.txt \
+        -v $world_path/packet-statistics.txt:$SERVER_PATH/packet-statistics.txt \
+        -v $world_path/development_behavior_packs:$SERVER_PATH/development_behavior_packs \
+        -v $world_path/development_resource_packs:$SERVER_PATH/development_resource_packs \
+        -v $world_path/development_skin_packs:$SERVER_PATH/development_skin_packs \
+        -v $world_path/minecraftpe:$SERVER_PATH/minecraftpe \
+        -v $world_path/premium_cache:$SERVER_PATH/premium_cache \
+        -v $world_path/treatments:$SERVER_PATH/treatments \
+        -v $world_path/worlds:$SERVER_PATH/worlds \
+        -v $world_path/world_templates:$SERVER_PATH/world_templates \
+        minecraft-bedrock:$SERVER_VERSION \
+        /opt/minecraft/bedrock_server
+
+}
+
+function start {
+    local world_name=$1
+
+    local world_path=$WORLDS_PATH/$world_name
+
+#        --net=host \
+
+    docker run -it --rm \
+        --name minecraft-bedrock \
+        -p 19132:19132/udp \
+        --user `id -u` \
+        -v $world_path:/storage \
+        minecraft-bedrock:$SERVER_VERSION
+
+}
+
+function generate_libs_list {
+    for L in brotlicommon.so.1 brotlidec.so.1 com_err.so.2 crypto.so.1.1 dl.so.2 ffi.so.7 gcrypt.so.20 gmp.so.10 gnutls.so.30 gpg-error.so.0 gssapi_krb5.so.2 hogweed.so.6 idn2.so.0 k5crypto.so.3 keyutils.so.1 krb5.so.3 krb5support.so.0 lber-
+        echo "COPY --from=build /lib/x86_64-linux-gnu/lib$L        /lib/x86_64-linux-gnu/lib$L"
+    done
+}
+
+# build_image
+
+# create_world EpicJungle 442812649
+
+start EpicJungle
